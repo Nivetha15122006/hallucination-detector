@@ -45,7 +45,9 @@ Results are injected directly into the ChatGPT/Gemini interface as a badge — n
 
 **📊 Model Performance**
 
-MetricScoreAccuracy84%+F1 Weighted85%+F1 Macro82%+Training examples25,011Evaluation setTruthfulQA (817 questions)
+| Accuracy    | 87.05% |
+| F1 Weighted | 86.90% |
+| F1 Macro    | 86.27% |
 
 **🛠️ Tech Stack**
 | Layer | Technology |
@@ -89,3 +91,5 @@ Existing tools like Galileo and Braintrust cost thousands of dollars and target 
 
 Nivetha G — M.Sc. AI & ML, Coimbatore Institute of Technology
 GitHub: https://github.com/Nivetha15122006/hallucination-detector
+HuggingFace link:
+Model: https://huggingface.co/NiviG/hallucination-detector
