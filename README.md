@@ -92,6 +92,8 @@ Existing tools like Galileo and Braintrust cost thousands of dollars and target 
 **👩‍💻 Built By**
 
 Nivetha G — M.Sc. AI & ML, Coimbatore Institute of Technology
+
 GitHub: https://github.com/Nivetha15122006/hallucination-detector
+
 HuggingFace link:
 Model: https://huggingface.co/NiviG/hallucination-detector
