@@ -46,7 +46,9 @@ Results are injected directly into the ChatGPT/Gemini interface as a badge — n
 **📊 Model Performance**
 
 | Accuracy    | 87.05% |
+
 | F1 Weighted | 86.90% |
+
 | F1 Macro    | 86.27% |
 
 **🛠️ Tech Stack**
