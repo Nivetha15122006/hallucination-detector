@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Hallucination Detector",
+  "version": "1.0",
+  "description": "Detects hallucinations in ChatGPT responses in real-time",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://*.ngrok-free.app/*",
+    "https://*.ngrok-free.dev/*",
+    "https://*.onrender.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Hallucination Detector"
+  }
+}

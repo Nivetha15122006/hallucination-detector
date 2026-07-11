@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+    .status {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .status.active {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    .api-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 8px;
+      box-sizing: border-box;
+    }
+    .save-btn {
+      width: 100%;
+      padding: 8px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .save-btn:hover { background: #2563eb; }
+    .legend {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #374151;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span style="font-size: 20px">🔍</span>
+    <div class="title">Hallucination Detector</div>
+  </div>
+  <div class="subtitle">Automatically checks ChatGPT responses for factual accuracy.</div>
+
+  <div class="status active">
+    ✅ Extension is active on ChatGPT
+  </div>
+
+  <div style="font-size: 12px; color: #374151; margin-bottom: 6px; font-weight: 500;">
+    API URL:
+  </div>
+  <input
+    type="text"
+    class="api-input"
+    id="apiUrl"
+    placeholder="https://your-api-url.ngrok-free.dev"
+  />
+  <button class="save-btn" id="saveBtn">Save API URL</button>
+
+  <div class="legend">
+    <div style="font-weight: 500; margin-bottom: 6px; margin-top: 12px;">Badge Legend:</div>
+    <div class="legend-item">✅ <span>FACTUAL — answer is accurate</span></div>
+    <div class="legend-item">⚠️ <span>HALLUCINATION — answer may be wrong</span></div>
+    <div class="legend-item">❓ <span>UNCERTAIN — cannot verify</span></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
