@@ -1,5 +1,5 @@
 // API URL — update this when you deploy to Render
-const API_URL = "https://unloving-relation-thumping.ngrok-free.dev";
+const API_URL = "https://hallucination-detector-api-yp5a.onrender.com";
 
 // Track processed messages to avoid duplicates
 const processedMessages = new Set();
