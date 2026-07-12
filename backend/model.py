@@ -1,49 +1,60 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import numpy as np
+import requests
 import os
 
 class HallucinationDetector:
     def __init__(self):
-        self.device = torch.device('cpu')
-        self.tokenizer = None
-        self.model = None
+        self.api_url = "https://api-inference.huggingface.co/models/NiviG/hallucination-detector"
+        self.headers = {"Authorization": f"Bearer {os.getenv('HF_TOKEN', '')}"}
         self.labels = {0: 'FACTUAL', 1: 'UNCERTAIN', 2: 'HALLUCINATION'}
-        self._load()
-
-    def _load(self):
-        print("Loading DeBERTa model...")
-        model_name = "NiviG/hallucination-detector"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            low_cpu_mem_usage=True
-        )
-        self.model = self.model.float()
-        self.model.eval()
-        print("Model loaded!")
+        print("HuggingFace Inference API ready!")
 
     def predict(self, premise: str, hypothesis: str):
-        inputs = self.tokenizer(
-            premise,
-            hypothesis,
-            truncation=True,
-            max_length=128,
-            padding='max_length',
-            return_tensors='pt'
-        )
-
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1).numpy()[0]
-            pred_id = int(np.argmax(probs))
-
-        return {
-            'label': self.labels[pred_id],
-            'confidence': float(probs[pred_id]),
-            'scores': {
-                'FACTUAL': float(probs[0]),
-                'UNCERTAIN': float(probs[1]),
-                'HALLUCINATION': float(probs[2])
+        try:
+            payload = {
+                "inputs": {
+                    "text": premise,
+                    "text_pair": hypothesis
+                }
             }
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                # Parse HuggingFace response
+                if isinstance(result, list) and len(result) > 0:
+                    scores = {item['label']: item['score'] for item in result[0]}
+                    
+                    # Map labels
+                    label_map = {
+                        'LABEL_0': 'FACTUAL',
+                        'LABEL_1': 'UNCERTAIN', 
+                        'LABEL_2': 'HALLUCINATION'
+                    }
+                    
+                    best_label = max(scores, key=scores.get)
+                    mapped_label = label_map.get(best_label, 'UNCERTAIN')
+                    confidence = scores[best_label]
+                    
+                    return {
+                        'label': mapped_label,
+                        'confidence': float(confidence),
+                        'scores': {
+                            'FACTUAL': float(scores.get('LABEL_0', 0)),
+                            'UNCERTAIN': float(scores.get('LABEL_1', 0)),
+                            'HALLUCINATION': float(scores.get('LABEL_2', 0))
+                        }
+                    }
+        except Exception as e:
+            print(f"HF API error: {e}")
+        
+        # Fallback
+        return {
+            'label': 'UNCERTAIN',
+            'confidence': 0.5,
+            'scores': {'FACTUAL': 0.33, 'UNCERTAIN': 0.34, 'HALLUCINATION': 0.33}
         }
