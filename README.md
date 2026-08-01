@@ -94,6 +94,54 @@ Existing tools like Galileo and Braintrust cost thousands of dollars and target 
 Nivetha G — M.Sc. AI & ML, Coimbatore Institute of Technology
 
 GitHub: https://github.com/Nivetha15122006/hallucination-detector
-
-HuggingFace link:
 Model: https://huggingface.co/NiviG/hallucination-detector
+
+---
+
+## 🚀 How to Setup and Run
+
+Follow these steps to run the hallucination detector locally on your machine:
+
+### 1. Installation & Environment Setup
+Clone the repository and set up a Python virtual environment:
+```bash
+git clone https://github.com/Nivetha15122006/hallucination-detector.git
+cd hallucination-detector
+
+# Create and activate virtual environment
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. Build the Knowledge Base (RAG Index)
+Run the automated downloader to fetch Wikipedia pages and build the FAISS vector index:
+```bash
+python backend/build_knowledge_base.py
+```
+*This will generate the indexed vectors inside the `data/` directory.*
+
+### 3. Run and Test Locally (No Server Required)
+You can evaluate the retriever and the DeBERTa model accuracy directly in your terminal:
+```bash
+python backend/test_detector.py
+```
+
+### 4. Run the FastAPI Backend Server
+Start the web API using Uvicorn:
+```bash
+python backend/main.py
+```
+*The server will start listening at `http://localhost:8000`.*
+
+### 5. Install the Chrome Extension
+1. Open Google Chrome and navigate to `chrome://extensions/`.
+2. Toggle on **Developer mode** in the top-right corner.
+3. Click **Load unpacked** in the top-left corner.
+4. Select the **`extension/`** folder inside your project directory.
+5. Go to ChatGPT, ask a question (e.g. *"Who invented the telephone?"*), and see the factual verification badges render automatically!
