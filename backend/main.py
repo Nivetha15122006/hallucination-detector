@@ -1,3 +1,8 @@
+import os
+# Configure HuggingFace cache directory to a local path to avoid permission errors
+os.environ["HF_HOME"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hf_cache"))
+os.environ["TRANSFORMERS_CACHE"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hf_cache"))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -51,14 +56,18 @@ def check_hallucination(request: CheckRequest):
         r = get_retriever()
         d = get_detector()
 
+        # Retrieve evidence from our expanded FAISS index
+        # We query using the question and get the top matching chunks
         evidence = r.retrieve(request.question, top_k=3)
         if not evidence:
-            raise HTTPException(status_code=404, detail="No evidence found")
+            raise HTTPException(status_code=404, detail="No evidence found in knowledge base")
 
         top_evidence = evidence[0]['text']
+        
+        # Predict whether the AI answer (claim) is factual or hallucinated given the top Wikipedia evidence chunk
         result = d.predict(
-            premise=top_evidence,
-            hypothesis=request.ai_answer
+            claim=request.ai_answer,
+            evidence=top_evidence
         )
 
         label = result['label']
@@ -79,6 +88,8 @@ def check_hallucination(request: CheckRequest):
             'summary': summary
         }
 
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=500, detail=str(fnf))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

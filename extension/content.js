@@ -1,45 +1,86 @@
-// API URL — update this when you deploy to Render
-const API_URL = "https://hallucination-detector-api-yp5a.onrender.com";
+// API URL — update this when you deploy to Render. For local testing, change to http://localhost:8000
+const API_URL = "http://localhost:8000";
 
 // Track processed messages to avoid duplicates
 const processedMessages = new Set();
 
+// Helper to fetch with timeout
+async function fetchWithTimeout(url, options = {}, timeout = 120000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    return response;
+  } catch (error) {
+    clearTimeout(timer);
+    throw error;
+  }
+}
+
 // Main function to check a response
 async function checkHallucination(question, aiAnswer, badgeContainer) {
-  try {
-    badgeContainer.innerHTML = `
-      <div style="
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 6px 12px; border-radius: 20px;
-        background: #f3f4f6; border: 1px solid #d1d5db;
-        font-size: 12px; color: #6b7280; margin-top: 8px;
-        font-family: sans-serif;
-      ">
-        ⏳ Checking for hallucinations...
-      </div>
-    `;
+  // Set initial status
+  badgeContainer.innerHTML = `
+    <div id="badge-status-container" style="
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 20px;
+      background: #f3f4f6; border: 1px solid #d1d5db;
+      font-size: 12px; color: #4b5563; margin-top: 8px;
+      font-family: sans-serif;
+    ">
+      <span>⏳ Checking for hallucinations...</span>
+    </div>
+  `;
 
-    const response = await fetch(`${API_URL}/check`, {
+  // Start a timer to show "warming up" if server takes more than 4 seconds to respond (Render spin-down check)
+  const warmupTimer = setTimeout(() => {
+    const statusDiv = badgeContainer.querySelector('#badge-status-container');
+    if (statusDiv) {
+      statusDiv.innerHTML = `<span>⏳ Warming up backend server... (Render free tier takes ~60s to wake up)</span>`;
+      statusDiv.style.background = "#fffbeb";
+      statusDiv.style.border = "1px solid #fde68a";
+      statusDiv.style.color = "#b45309";
+    }
+  }, 4000);
+
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question, ai_answer: aiAnswer })
-    });
+    }, 120000); // 120 seconds timeout
 
-    if (!response.ok) throw new Error("API error");
+    clearTimeout(warmupTimer);
+
+    if (!response.ok) {
+      throw new Error(`API returned HTTP ${response.status}`);
+    }
 
     const data = await response.json();
     showBadge(badgeContainer, data);
 
   } catch (error) {
+    clearTimeout(warmupTimer);
+    console.error("Hallucination Detector Error:", error);
+    
+    let errorMsg = "Could not verify (API unavailable)";
+    if (error.name === 'AbortError') {
+      errorMsg = "Verification timed out (Server failed to respond in 120s)";
+    }
+
     badgeContainer.innerHTML = `
       <div style="
         display: inline-flex; align-items: center; gap: 6px;
         padding: 6px 12px; border-radius: 20px;
-        background: #f3f4f6; border: 1px solid #d1d5db;
-        font-size: 12px; color: #6b7280; margin-top: 8px;
+        background: #fef2f2; border: 1px solid #fca5a5;
+        font-size: 12px; color: #b91c1c; margin-top: 8px;
         font-family: sans-serif;
       ">
-        ⚠️ Could not verify (API unavailable)
+        ⚠️ ${errorMsg}
       </div>
     `;
   }
@@ -55,7 +96,8 @@ function showBadge(container, data) {
 
   const c = colors[data.label] || colors.UNCERTAIN;
   const confidence = Math.round(data.confidence * 100);
-  const evidence = data.evidence?.[0]?.text?.substring(0, 100) || '';
+  const evidence = data.evidence?.[0]?.text?.substring(0, 150) || '';
+  const evidenceUrl = data.evidence?.[0]?.url || '';
 
   container.innerHTML = `
     <div style="
@@ -76,10 +118,11 @@ function showBadge(container, data) {
       ${evidence ? `
         <div style="
           font-size: 11px; color: ${c.text};
-          opacity: 0.7; margin-top: 4px;
-          border-top: 1px solid ${c.border}; padding-top: 4px;
+          opacity: 0.7; margin-top: 6px;
+          border-top: 1px solid ${c.border}; padding-top: 6px;
         ">
-          📄 Evidence: ${evidence}...
+          📄 <strong>Evidence chunk:</strong> "${evidence}..."
+          ${evidenceUrl ? `<br/><a href="${evidenceUrl}" target="_blank" style="color: ${c.text}; text-decoration: underline; font-weight: 500; font-size: 10px; display: inline-block; margin-top: 2px;">Read full source page</a>` : ''}
         </div>
       ` : ''}
     </div>

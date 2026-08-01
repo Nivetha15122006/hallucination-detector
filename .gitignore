@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 models/
 *.incomplete
+hf_cache/
+venv/
+.env
+

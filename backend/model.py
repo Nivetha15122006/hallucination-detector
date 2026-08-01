@@ -14,20 +14,27 @@ class HallucinationDetector:
         print("Loading model...")
         model_name = "NiviG/hallucination-detector"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Load in float32 to avoid LayerNorm errors on CPU
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            low_cpu_mem_usage=True,
-            torch_dtype=torch.float16
+            model_name
         )
+        self.model = self.model.float() # Ensure float32
         self.model.eval()
         print("Model loaded!")
 
-    def predict(self, premise: str, hypothesis: str):
+    def predict(self, claim: str, evidence: str):
+        """
+        Predict whether a claim is FACTUAL, UNCERTAIN, or a HALLUCINATION given an evidence paragraph.
+        
+        The model was trained with:
+          Text 1 (First argument): The claim to check
+          Text 2 (Second argument): The evidence context
+        """
         inputs = self.tokenizer(
-            premise,
-            hypothesis,
+            claim,      # Claim is the first sentence
+            evidence,   # Evidence is the second sentence
             truncation=True,
-            max_length=128,
+            max_length=256, # Matches training max_length
             padding='max_length',
             return_tensors='pt'
         )
