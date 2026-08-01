@@ -1,40 +1,99 @@
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import numpy as np
+import requests
 
 class HallucinationDetector:
     def __init__(self):
-        self.device = torch.device('cpu')
+        # Read execution mode from environment variables
+        self.use_hf_api = os.getenv("USE_HF_API", "false").lower() == "true"
+        self.hf_token = os.getenv("HF_TOKEN", "")  # Optional: HF token for higher API limits
+        
+        self.labels = {0: 'FACTUAL', 1: 'UNCERTAIN', 2: 'HALLUCINATION'}
         self.tokenizer = None
         self.model = None
-        self.labels = {0: 'FACTUAL', 1: 'UNCERTAIN', 2: 'HALLUCINATION'}
-        self._load()
+        
+        # Load HuggingFace tokenizer (it's small and used to parse input lengths)
+        self.model_name = "NiviG/hallucination-detector"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        
+        if self.use_hf_api:
+            print("Detector initialized in Hugging Face Serverless API Mode! (Memory Optimized)")
+        else:
+            self._load()
 
     def _load(self):
-        print("Loading model...")
-        model_name = "NiviG/hallucination-detector"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        # Load in float32 to avoid LayerNorm errors on CPU
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name
-        )
-        self.model = self.model.float() # Ensure float32
+        print("Loading model locally...")
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+        self.model = self.model.float() # Ensure float32 for CPU LayerNorm compat
         self.model.eval()
-        print("Model loaded!")
+        print("Model loaded locally!")
 
     def predict(self, claim: str, evidence: str):
         """
         Predict whether a claim is FACTUAL, UNCERTAIN, or a HALLUCINATION given an evidence paragraph.
-        
-        The model was trained with:
-          Text 1 (First argument): The claim to check
-          Text 2 (Second argument): The evidence context
         """
+        if self.use_hf_api:
+            # Query Hugging Face serverless Inference API
+            url = f"https://api-inference.huggingface.co/models/NiviG/hallucination-detector"
+            headers = {}
+            if self.hf_token:
+                headers["Authorization"] = f"Bearer {self.hf_token}"
+                
+            payload = {
+                "inputs": {
+                    "text": claim,
+                    "text_pair": evidence
+                },
+                "options": {
+                    "wait_for_model": True  # Force HF to spin up the model if sleeping
+                }
+            }
+            
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                if response.status_code == 200:
+                    data = response.json()
+                    # Response format: [[{"label": "LABEL_0", "score": 0.9}, ...]]
+                    predictions = data[0]
+                    
+                    scores = {"FACTUAL": 0.0, "UNCERTAIN": 0.0, "HALLUCINATION": 0.0}
+                    for pred in predictions:
+                        lbl = pred["label"]
+                        score = float(pred["score"])
+                        
+                        # Map Hugging Face label output keys to our schema
+                        if lbl == "LABEL_0" or lbl == "FACTUAL":
+                            scores["FACTUAL"] = score
+                        elif lbl == "LABEL_1" or lbl == "UNCERTAIN":
+                            scores["UNCERTAIN"] = score
+                        elif lbl == "LABEL_2" or lbl == "HALLUCINATION":
+                            scores["HALLUCINATION"] = score
+                            
+                    pred_label = max(scores, key=scores.get)
+                    return {
+                        'label': pred_label,
+                        'confidence': scores[pred_label],
+                        'scores': scores
+                    }
+                else:
+                    print(f"[WARNING] HF Inference API returned error {response.status_code}: {response.text}")
+                    raise RuntimeError("HF API error")
+            except Exception as e:
+                print(f"[ERROR] HF Inference API call failed: {e}. Falling back to local execution...")
+                if self.model is None:
+                    self._load()
+                return self._predict_local(claim, evidence)
+        else:
+            return self._predict_local(claim, evidence)
+
+    def _predict_local(self, claim: str, evidence: str):
         inputs = self.tokenizer(
-            claim,      # Claim is the first sentence
-            evidence,   # Evidence is the second sentence
+            claim,
+            evidence,
             truncation=True,
-            max_length=256, # Matches training max_length
+            max_length=256,
             padding='max_length',
             return_tensors='pt'
         )
