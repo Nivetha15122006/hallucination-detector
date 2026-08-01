@@ -136,10 +136,16 @@ function processResponses() {
   const questions = document.querySelectorAll('[data-message-author-role="user"]');
 
   responses.forEach((response, index) => {
+    // 1. Avoid duplicates: If this response block already has a badge injected, skip it!
+    if (response.querySelector('.hallucination-badge')) return;
+
+    // 2. Ignore messages that are still actively streaming/typing
+    if (response.classList.contains('result-streaming')) return;
+
     const responseText = response.innerText?.trim();
     if (!responseText || responseText.length < 20) return;
 
-    // Avoid duplicate processing
+    // 3. Prevent duplicate calls using the message ID set
     const msgId = responseText.substring(0, 50);
     if (processedMessages.has(msgId)) return;
     processedMessages.add(msgId);
