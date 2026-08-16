@@ -1,4 +1,8 @@
 import os
+import sys
+# Append the backend directory to sys.path to resolve imports correctly when running as a module
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 # Configure HuggingFace cache directory to a local path to avoid permission errors
 os.environ["HF_HOME"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hf_cache"))
 os.environ["TRANSFORMERS_CACHE"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hf_cache"))
