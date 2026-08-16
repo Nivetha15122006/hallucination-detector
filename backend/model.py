@@ -51,40 +51,49 @@ class HallucinationDetector:
                 }
             }
             
-            try:
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
-                if response.status_code == 200:
-                    data = response.json()
-                    # Response format: [[{"label": "LABEL_0", "score": 0.9}, ...]]
-                    predictions = data[0]
+            import time
+            for attempt in range(1, 4):
+                try:
+                    response = requests.post(url, json=payload, headers=headers, timeout=30)
                     
-                    scores = {"FACTUAL": 0.0, "UNCERTAIN": 0.0, "HALLUCINATION": 0.0}
-                    for pred in predictions:
-                        lbl = pred["label"]
-                        score = float(pred["score"])
+                    # If the model is sleeping, Hugging Face returns HTTP 503
+                    if response.status_code == 503:
+                        data = response.json()
+                        estimated_time = data.get("estimated_time", 15)
+                        print(f"⏳ HF Model is currently loading. Waiting {int(estimated_time)}s (Attempt {attempt}/3)...")
+                        time.sleep(estimated_time)
+                        continue
                         
-                        # Map Hugging Face label output keys to our schema
-                        if lbl == "LABEL_0" or lbl == "FACTUAL":
-                            scores["FACTUAL"] = score
-                        elif lbl == "LABEL_1" or lbl == "UNCERTAIN":
-                            scores["UNCERTAIN"] = score
-                        elif lbl == "LABEL_2" or lbl == "HALLUCINATION":
-                            scores["HALLUCINATION"] = score
+                    if response.status_code == 200:
+                        data = response.json()
+                        predictions = data[0]
+                        
+                        scores = {"FACTUAL": 0.0, "UNCERTAIN": 0.0, "HALLUCINATION": 0.0}
+                        for pred in predictions:
+                            lbl = pred["label"]
+                            score = float(pred["score"])
                             
-                    pred_label = max(scores, key=scores.get)
-                    return {
-                        'label': pred_label,
-                        'confidence': scores[pred_label],
-                        'scores': scores
-                    }
-                else:
-                    print(f"[WARNING] HF Inference API returned error {response.status_code}: {response.text}")
-                    raise RuntimeError("HF API error")
-            except Exception as e:
-                print(f"[ERROR] HF Inference API call failed: {e}. Falling back to local execution...")
-                if self.model is None:
-                    self._load()
-                return self._predict_local(claim, evidence)
+                            # Map Hugging Face label output keys to our schema
+                            if lbl == "LABEL_0" or lbl == "FACTUAL":
+                                scores["FACTUAL"] = score
+                            elif lbl == "LABEL_1" or lbl == "UNCERTAIN":
+                                scores["UNCERTAIN"] = score
+                            elif lbl == "LABEL_2" or lbl == "HALLUCINATION":
+                                scores["HALLUCINATION"] = score
+                                
+                        pred_label = max(scores, key=scores.get)
+                        return {
+                            'label': pred_label,
+                            'confidence': scores[pred_label],
+                            'scores': scores
+                        }
+                    else:
+                        raise RuntimeError(f"HF API returned HTTP {response.status_code}: {response.text}")
+                except Exception as e:
+                    print(f"[ERROR] HF Inference API attempt {attempt} failed: {e}")
+                    if attempt == 3:
+                        raise RuntimeError(f"Failed to query Hugging Face API after 3 attempts: {e}")
+                    time.sleep(2)
         else:
             return self._predict_local(claim, evidence)
 
