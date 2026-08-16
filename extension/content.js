@@ -57,7 +57,8 @@ async function checkHallucination(question, aiAnswer, badgeContainer) {
     clearTimeout(warmupTimer);
 
     if (!response.ok) {
-      throw new Error(`API returned HTTP ${response.status}`);
+      const errText = await response.text();
+      throw new Error(`API returned HTTP ${response.status}: ${errText}`);
     }
 
     const data = await response.json();
