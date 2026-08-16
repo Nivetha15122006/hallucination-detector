@@ -36,11 +36,11 @@ async function checkHallucination(question, aiAnswer, badgeContainer) {
     </div>
   `;
 
-  // Start a timer to show "warming up" if server takes more than 4 seconds to respond (Render spin-down check)
+  // Start a timer to show "warming up" if server takes more than 4 seconds to respond
   const warmupTimer = setTimeout(() => {
     const statusDiv = badgeContainer.querySelector('#badge-status-container');
     if (statusDiv) {
-      statusDiv.innerHTML = `<span>⏳ Warming up backend server... (Render free tier takes ~60s to wake up)</span>`;
+      statusDiv.innerHTML = `<span>⏳ Processing verification check...</span>`;
       statusDiv.style.background = "#fffbeb";
       statusDiv.style.border = "1px solid #fde68a";
       statusDiv.style.color = "#b45309";
@@ -172,20 +172,8 @@ function processResponses() {
   });
 }
 
-// Watch for new responses using MutationObserver
-const observer = new MutationObserver((mutations) => {
-  for (const mutation of mutations) {
-    if (mutation.addedNodes.length > 0) {
-      setTimeout(processResponses, 2000);
-    }
-  }
-});
-
-// Start observing
-observer.observe(document.body, {
-  childList: true,
-  subtree: true
-});
+// Run processResponses every 1.5 seconds to capture new or completed responses dynamically
+setInterval(processResponses, 1500);
 
 // Run on page load
 setTimeout(processResponses, 3000);
