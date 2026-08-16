@@ -1,5 +1,5 @@
 // API URL — update this when you deploy to Render. For local testing, change to http://localhost:8000
-const API_URL = "http://localhost:8000";
+const API_URL = "https://hallucination-detector-b9jx.onrender.com";
 
 // Track processed messages to avoid duplicates
 const processedMessages = new Set();
