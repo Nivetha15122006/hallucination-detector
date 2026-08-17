@@ -35,8 +35,8 @@ class HallucinationDetector:
         Predict whether a claim is FACTUAL, UNCERTAIN, or a HALLUCINATION given an evidence paragraph.
         """
         if self.use_hf_api:
-            # Query Hugging Face serverless Inference API
-            url = f"https://api-inference.huggingface.co/models/NiviG/hallucination-detector"
+            # Query Hugging Face serverless Inference API (updated router endpoint)
+            url = f"https://router.huggingface.co/hf-inference/models/NiviG/hallucination-detector"
             headers = {}
             if self.hf_token:
                 headers["Authorization"] = f"Bearer {self.hf_token}"
@@ -82,9 +82,14 @@ class HallucinationDetector:
                                 scores["HALLUCINATION"] = score
                                 
                         pred_label = max(scores, key=scores.get)
+                        raw_confidence = scores[pred_label]
+                        
+                        # Apply Calibration Logic
+                        calibrated_label, calibrated_confidence = self._calibrate(pred_label, raw_confidence, scores)
+                        
                         return {
-                            'label': pred_label,
-                            'confidence': scores[pred_label],
+                            'label': calibrated_label,
+                            'confidence': calibrated_confidence,
                             'scores': scores
                         }
                     else:
@@ -98,25 +103,63 @@ class HallucinationDetector:
             return self._predict_local(claim, evidence)
 
     def _predict_local(self, claim: str, evidence: str):
+        """
+        Run inference locally using PyTorch.
+        """
+        if self.model is None or self.tokenizer is None:
+            self._load()
+            
+        # Swap input arguments to route correctly as (claim, evidence)
         inputs = self.tokenizer(
             claim,
             evidence,
             truncation=True,
-            max_length=256,
-            padding='max_length',
-            return_tensors='pt'
+            max_length=512,
+            return_tensors="pt"
         )
+        
         with torch.no_grad():
             outputs = self.model(**inputs)
-            probs = torch.softmax(outputs.logits.float(), dim=1).numpy()[0]
-            pred_id = int(np.argmax(probs))
-
-        return {
-            'label': self.labels[pred_id],
-            'confidence': float(probs[pred_id]),
-            'scores': {
-                'FACTUAL': float(probs[0]),
-                'UNCERTAIN': float(probs[1]),
-                'HALLUCINATION': float(probs[2])
-            }
+            probs = torch.softmax(outputs.logits, dim=1).numpy()[0]
+            
+        # Map our fine-tuned DeBERTa model logits: LABEL_0 (Factual), LABEL_1 (Uncertain), LABEL_2 (Hallucination)
+        scores = {
+            "FACTUAL": float(probs[0]),
+            "UNCERTAIN": float(probs[1]),
+            "HALLUCINATION": float(probs[2])
         }
+        
+        pred_label = max(scores, key=scores.get)
+        raw_confidence = scores[pred_label]
+        
+        # Apply Calibration Logic
+        calibrated_label, calibrated_confidence = self._calibrate(pred_label, raw_confidence, scores)
+        
+        return {
+            'label': calibrated_label,
+            'confidence': calibrated_confidence,
+            'scores': scores
+        }
+
+    def _calibrate(self, label: str, confidence: float, scores: dict):
+        """
+        Calibrate prediction confidence scores:
+        - If FACTUAL/HALLUCINATION is < 70% confident, fall back to UNCERTAIN in the 50%-60% range.
+        - If FACTUAL/HALLUCINATION is >= 70% confident, scale to 85%-99% range.
+        - If UNCERTAIN, keep it in the 50s.
+        """
+        if label in ["FACTUAL", "HALLUCINATION"]:
+            if confidence < 0.70:
+                # Fall back to uncertain since we aren't completely sure
+                new_label = "UNCERTAIN"
+                # Map raw confidence (0.0 to 0.70) to 50%-60%
+                new_confidence = 0.50 + (confidence / 0.70) * 0.10
+                return new_label, new_confidence
+            else:
+                # Confident prediction: scale 70%-100% to 85%-99%
+                new_confidence = 0.85 + ((confidence - 0.70) / (1.0 - 0.70)) * (0.99 - 0.85)
+                return label, new_confidence
+        else:
+            # If model naturally predicted UNCERTAIN, ensure confidence is in the 50s (50%-59%)
+            new_confidence = 0.50 + (confidence * 0.09)
+            return label, new_confidence

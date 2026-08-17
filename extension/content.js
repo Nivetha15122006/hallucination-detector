@@ -1,5 +1,5 @@
 // API URL — update this when you deploy to Render. For local testing, change to http://localhost:8000
-const API_URL = "https://hallucination-detector-b9jx.onrender.com";
+const API_URL = "http://localhost:8000";
 
 // Track processed messages to avoid duplicates
 const processedMessages = new Set();
@@ -132,21 +132,18 @@ function showBadge(container, data) {
 
 // Find ChatGPT responses and inject badges
 function processResponses() {
-  // Select all conversation turn containers (articles)
-  const turns = document.querySelectorAll('article');
+  // ChatGPT response selector
+  const responses = document.querySelectorAll('[data-message-author-role="assistant"]');
+  const questions = document.querySelectorAll('[data-message-author-role="user"]');
 
-  turns.forEach((turn, index) => {
-    // Find the assistant's markdown response inside this turn
-    const assistantContent = turn.querySelector('.markdown') || turn.querySelector('[data-message-author-role="assistant"]');
-    if (!assistantContent) return; // This is a user turn or system turn, skip it!
-
-    // 1. Avoid duplicates: If this block already has a badge, skip it!
-    if (assistantContent.querySelector('.hallucination-badge') || turn.querySelector('.hallucination-badge')) return;
+  responses.forEach((response, index) => {
+    // 1. Avoid duplicates: If this response block already has a badge injected, skip it!
+    if (response.querySelector('.hallucination-badge')) return;
 
     // 2. Ignore messages that are still actively streaming/typing
-    if (turn.classList.contains('result-streaming') || assistantContent.classList.contains('result-streaming')) return;
+    if (response.classList.contains('result-streaming')) return;
 
-    const responseText = assistantContent.innerText?.trim();
+    const responseText = response.innerText?.trim();
     if (!responseText || responseText.length < 20) return;
 
     // 3. Prevent duplicate calls using the message ID set
@@ -154,18 +151,13 @@ function processResponses() {
     if (processedMessages.has(msgId)) return;
     processedMessages.add(msgId);
 
-    // Get corresponding user question from the previous turn container
-    let questionText = "Unknown question";
-    if (index > 0) {
-      const prevTurn = turns[index - 1];
-      const userContent = prevTurn.querySelector('[data-message-author-role="user"]') || prevTurn.querySelector('.markdown') || prevTurn;
-      questionText = userContent.innerText?.trim() || "Unknown question";
-    }
+    // Get corresponding question
+    const questionText = questions[index]?.innerText?.trim() || "Unknown question";
 
-    // Create badge container and append it directly to the assistant's content block
+    // Create badge container
     const badgeContainer = document.createElement('div');
     badgeContainer.className = 'hallucination-badge';
-    assistantContent.appendChild(badgeContainer);
+    response.appendChild(badgeContainer);
 
     // Check hallucination
     checkHallucination(questionText, responseText, badgeContainer);

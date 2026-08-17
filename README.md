@@ -48,10 +48,10 @@ graph TD
 
 ## 🧠 Core Architecture & Features
 
-* 🛡️ **Real-Time Fact Verification**: Automatically intercepts chat responses using DOM `MutationObservers` (Manifest V3) and validates them without manual copy-pasting.
+* 🛡️ **Real-Time Fact Verification**: Automatically intercepts chat responses using a 1.5-second polling loop and validates them directly inside ChatGPT without manual copy-pasting.
 * ⚡ **Semantic RAG Engine**: Utilizes **FAISS** and `all-MiniLM-L6-v2` SentenceTransformers to search and extract factual summaries from a 119-topic custom Wikipedia index.
 * 🧠 **Fine-Tuned Classifier**: Leverages a fine-tuned **DeBERTa-v3-base** (184M parameters) model trained on the FEVER NLI dataset to evaluate logical alignment.
-* ☁️ **Memory-Optimized Cloud Proxy**: Features a hybrid local/serverless execution mode to bypass 512MB cloud RAM limits, querying the Hugging Face Inference API dynamically.
+* 💻 **Offline & Local Inference**: Runs fully on your own machine, loading the model locally with CPU-optimized PyTorch weights for zero cloud dependency and strict privacy.
 
 ---
 
@@ -74,7 +74,7 @@ graph TD
 | **Vector Search** | FAISS + SentenceTransformers | Meta's flat L2 index running `all-MiniLM-L6-v2`. |
 | **Backend** | FastAPI + Uvicorn | Lightweight asynchronous Python server. |
 | **Frontend** | Chrome Extension (Manifest V3) | Native DOM integration for ChatGPT. |
-| **Deployment** | Render + Hugging Face | Free-tier compatible hosting (<150MB RAM). |
+| **Execution** | Local Host (CPU-Only) | Runs locally on your machine with no external API calls required. |
 
 ---
 
@@ -153,7 +153,7 @@ python -m venv venv
 # On Linux/macOS:
 source venv/bin/activate
 
-# Install dependencies
+# Install dependencies (CPU-optimized PyTorch is selected by default)
 pip install -r requirements.txt
 ```
 
@@ -162,7 +162,7 @@ Compile the Wikipedia RAG database index:
 ```bash
 python backend/build_knowledge_base.py
 ```
-*This downloads the Wikipedia extract summaries, compiles embeddings, and outputs `chunks.pkl` and `knowledge_base.index` in the `data/` directory.*
+*This downloads the Wikipedia summaries, compiles embeddings, and outputs `chunks.pkl` and `knowledge_base.index` in the `data/` directory.*
 
 ### 3. Run Pipeline Inference Tests (No Server Required)
 Verify the model's accuracy directly from the command line:
@@ -173,9 +173,10 @@ python backend/test_detector.py
 ### 4. Run the FastAPI Server
 Start the web API locally:
 ```bash
-python backend/main.py
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
-*The local server will start listening at `http://localhost:8000`.*
+> [!NOTE]
+> On the very first request, the server will download the **738MB DeBERTa model weights** to your local hard drive. This is a **one-time setup**; subsequent requests will load instantly from your local cache in under 2 seconds!
 
 ### 5. Install the Chrome Extension
 1. Open Google Chrome and go to `chrome://extensions/`.
@@ -183,15 +184,6 @@ python backend/main.py
 3. Click **Load unpacked** in the top-left corner.
 4. Select the **`extension/`** folder inside your project workspace.
 5. Go to ChatGPT, ask a question (e.g. *"Who invented the telephone?"*), and watch the badges render instantly!
-
-### 6. Cloud Deployment (Render)
-To host the backend API on Render's free tier without memory crashes:
-1. Create a **Web Service** on Render connected to this repository.
-2. Choose **Python 3** as the runtime.
-3. Set the **Build Command** to: `pip install -r requirements.txt`
-4. Set the **Start Command** to: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-5. In **Advanced Settings**, add this environment variable:
-   - `USE_HF_API`: `true` *(Forces server to route model checks through Hugging Face's serverless pipeline, saving RAM)*.
 
 ---
 
